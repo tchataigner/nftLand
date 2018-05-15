@@ -125,6 +125,8 @@ contract NftDelegation is ERC721,ERC994, NftAccessControl {
     )
         external
     {
+        require(msg.sender == nftIndexToOwner[_tokenId]);
+
         if(_approved) {
             approveAll(_operator);
         } else {
