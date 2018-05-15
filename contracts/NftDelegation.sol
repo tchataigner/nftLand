@@ -57,6 +57,49 @@ contract NftDelegation is ERC721,ERC994, NftAccessControl {
         require(owner != address(0));
     }
 
+    /** @notice Transfers the ownership of an NFT from one address to another address
+     * @param _from The current owner of the NFT
+     * @param _to The new owner
+     * @param _tokenId The NFT to transfer
+     * @param _data Additional data with no specified format, sent in call to `_to`
+     */
+    function safeTransferFrom(
+        address _from,
+        address _to,
+        uint256 _tokenId,
+        bytes _data
+    )
+    public
+    whenNotPaused
+    {
+        require(_to != address(0));
+        require(_isValidLicense(_tokenId));
+        transferFrom(_from, _to, _tokenId);
+        if (_isContract(_to)) {
+            bytes4 tokenReceiverResponse = ERC721TokenReceiver(_to).onERC721Received.gas(50000)(
+                _from, _tokenId, _data
+            );
+            require(tokenReceiverResponse == bytes4(keccak256("onERC721Received(address,uint256,bytes)")));
+        }
+    }
+
+    /** @notice Transfers the ownership of an NFT from one address to another address
+     * @param _from The current owner of the NFT
+     * @param _to The new owner
+     * @param _tokenId The NFT to transfer
+    */
+    function safeTransferFrom(
+        address _from,
+        address _to,
+        uint256 _tokenId
+    )
+    external
+    whenNotPaused
+    {
+        safeTransferFrom(_from, _to, _tokenId, "");
+    }
+
+
     /** @notice Transfer ownership of an NFT
      * @param _from The current owner of the NFT
      * @param _to The new owner
