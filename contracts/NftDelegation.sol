@@ -3,11 +3,12 @@ pragma solidity^0.4.23;
 import './interfaces/ERC721.sol';
 import './interfaces/ERC721Enumerable.sol';
 import './interfaces/ERC721Metadata.sol';
+import './interfaces/ERC721TokenReceiver.sol';
 import './interfaces/ERC994.sol';
 import './NftAccessControl.sol';
 import './math/SafeMath.sol';
 
-contract NftDelegation is ERC721,ERC994, NftAccessControl {
+contract NftDelegation is ERC721,ERC994, ERC721TokenReceiver, NftAccessControl {
     using SafeMath for uint256;
 
 
@@ -57,6 +58,39 @@ contract NftDelegation is ERC721,ERC994, NftAccessControl {
         require(owner != address(0));
     }
 
+    /** @notice Transfer ownership of an NFT
+     * @param _from The current owner of the NFT
+     * @param _to The new owner
+     * @param _tokenId The NFT to transfer
+     */
+    function transferFrom(
+        address _from,
+        address _to,
+        uint256 _tokenId
+    )
+    public
+    payable
+    {
+        require(isSenderApprovedFor(_tokenId));
+        require(_from == nftIndexToOwner[_tokenId]);
+        require(_to != address(0));
+        require(_to != address(this));
+
+        ownershipTokenCount[_to] = ownershipTokenCount[_to].add(1);
+        ownershipTokenCount[_from] = ownershipTokenCount[_from].sub(1);
+
+        nftIndexToOwner[_tokenId] = _to;
+
+
+        emit Transfer(_from, _to, _tokenId);
+    }
+
+    function _isContract(address addr) internal view returns (bool) {
+        uint size;
+        assembly { size := extcodesize(addr) }
+        return size > 0;
+    }
+
     /** @notice Transfers the ownership of an NFT from one address to another address
      * @param _from The current owner of the NFT
      * @param _to The new owner
@@ -70,10 +104,9 @@ contract NftDelegation is ERC721,ERC994, NftAccessControl {
         bytes _data
     )
     public
-    whenNotPaused
     {
         require(_to != address(0));
-        require(_isValidLicense(_tokenId));
+
         transferFrom(_from, _to, _tokenId);
         if (_isContract(_to)) {
             bytes4 tokenReceiverResponse = ERC721TokenReceiver(_to).onERC721Received.gas(50000)(
@@ -94,37 +127,9 @@ contract NftDelegation is ERC721,ERC994, NftAccessControl {
         uint256 _tokenId
     )
     external
-    whenNotPaused
+    payable
     {
         safeTransferFrom(_from, _to, _tokenId, "");
-    }
-
-
-    /** @notice Transfer ownership of an NFT
-     * @param _from The current owner of the NFT
-     * @param _to The new owner
-     * @param _tokenId The NFT to transfer
-     */
-    function transferFrom(
-        address _from,
-        address _to,
-        uint256 _tokenId
-    )
-        external
-        payable
-    {
-        require(isSenderApprovedFor(_tokenId));
-        require(_from == nftIndexToOwner[_tokenId]);
-        require(_to != address(0));
-        require(_to != address(this));
-
-        ownershipTokenCount[_to] = ownershipTokenCount[_to].add(1);
-        ownershipTokenCount[_from] = ownershipTokenCount[_from].sub(1);
-
-        nftIndexToOwner[_tokenId] = _to;
-
-
-        emit Transfer(_from, _to, _tokenId);
     }
 
     /** @notice Set or reaffirm the approved address for an NFT
@@ -168,8 +173,6 @@ contract NftDelegation is ERC721,ERC994, NftAccessControl {
     )
         external
     {
-        require(msg.sender == nftIndexToOwner[_tokenId]);
-
         if(_approved) {
             approveAll(_operator);
         } else {
